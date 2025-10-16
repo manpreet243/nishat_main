@@ -13,18 +13,13 @@ export interface DomainConfig {
 export const domainConfig: DomainConfig = {
   // List of authorized domains that can access this application
   authorizedDomains: [
-    // Production domains
-    'nishatbeverages.com',
-    'www.nishatbeverages.com',
-    
-    // Add your custom domains here
-    // 'yourdomain.com',
-    // 'app.yourdomain.com',
-    
-    // Localhost for development (also controlled by allowLocalhost)
-    'localhost',
-    '127.0.0.1',
-  ],
+  'nishatbeverages.com',
+  'www.nishatbeverages.com',
+  'localhost',
+  '127.0.0.1',
+  'nishatmain-q2mu67mnc-manpreet243s-projects.vercel.app'
+],
+
   
   // Allow access from localhost and local IP addresses during development
   allowLocalhost: true,
