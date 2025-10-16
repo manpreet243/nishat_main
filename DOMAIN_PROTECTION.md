@@ -29,19 +29,7 @@ The domain protection system ensures that the application can only be accessed f
 
 The domain configuration is managed in `config/domainConfig.ts`:
 
-```typescript
-export const domainConfig: DomainConfig = {
-  authorizedDomains: [
-    'nishatbeverages.com',
-    'www.nishatbeverages.com',
-    'localhost',
-    '127.0.0.1',
-  ],
-  allowLocalhost: true,
-  allowDevelopment: true,
-  logAccessAttempts: true,
-};
-```
+
 
 ### Adding Your Domains
 
@@ -63,7 +51,7 @@ authorizedDomains: [
   
   // Localhost (for development)
   'localhost',
-  'http://localhost:5174/',
+  '127.0.0.1',
 ],
 ```
 
