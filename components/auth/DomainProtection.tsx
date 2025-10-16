@@ -47,9 +47,9 @@ const DomainProtection: React.FC<DomainProtectionProps> = ({
       setIsLoading(false);
 
       // Log access attempt for security monitoring
-      if (!authorized) {
-        console.warn(`Unauthorized domain access attempt: ${fullDomain}`);
-      }
+      //if (!authorized) {
+       // console.warn(`Unauthorized domain access attempt: ${fullDomain}`);
+     // }
     };
 
     checkDomain();
