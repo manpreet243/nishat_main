@@ -7,16 +7,18 @@ interface EditCustomerModalProps {
     customer: Customer | null;
     onUpdateCustomer: (customer: Customer) => void;
     salesmen: Salesman[];
+    areas?: { id: number; name: string }[];
 }
 
-const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, onClose, customer, onUpdateCustomer, salesmen }) => {
+const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, onClose, customer, onUpdateCustomer, salesmen, areas }) => {
     const [name, setName] = useState('');
     const [houseNumber, setHouseNumber] = useState('');
     const [floor, setFloor] = useState(0);
     const [mobile, setMobile] = useState('');
     // bottlePrice removed; pricing comes from inventory items
     const [salesmanId, setSalesmanId] = useState<number | undefined>(undefined);
-    const [deliveryArea, setDeliveryArea] = useState('');
+    const [assignedAreaId, setAssignedAreaId] = useState<number | undefined>(undefined);
+    const [sector, setSector] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         if (customer) {
@@ -26,7 +28,8 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, onClose, 
             setMobile(customer.mobile);
             // no per-customer price to set
             setSalesmanId(customer.salesmanId);
-            setDeliveryArea(customer.deliveryArea || '');
+            setAssignedAreaId((customer as any).assignedAreaId);
+            setSector((customer as any).sector);
         }
     }, [customer]);
 
@@ -35,14 +38,15 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, onClose, 
         e.preventDefault();
         if (customer) {
                 onUpdateCustomer({
-                ...customer,
-                name,
-                houseNumber,
-                floor,
-                mobile,
-                salesmanId,
-                deliveryArea: deliveryArea || undefined,
-            });
+                    ...customer,
+                    name,
+                    houseNumber,
+                    floor,
+                    mobile,
+                    salesmanId,
+                    assignedAreaId,
+                    sector,
+                });
         }
     };
 
@@ -85,9 +89,19 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, onClose, 
                             {salesmen.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
+                    {/* Delivery area is taken from the customer's address; not editable here per UX requirement */}
                     <div>
-                        <label htmlFor="edit-delivery-area" className="block text-sm font-medium text-brand-text-secondary">Delivery Area</label>
-                        <input type="text" id="edit-delivery-area" value={deliveryArea} onChange={e => setDeliveryArea(e.target.value)} placeholder="e.g., North Zone" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
+                        <label htmlFor="edit-sector" className="block text-sm font-medium text-brand-text-secondary">Sector</label>
+                        <select id="edit-sector" value={sector ?? ''} onChange={e => setSector(e.target.value ? e.target.value : undefined)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm">
+                            <option value="">Select sector</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="G">G</option>
+                        </select>
                     </div>
                     <div className="flex justify-end pt-4 space-x-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-brand-text-secondary rounded-md hover:bg-gray-300">Cancel</button>

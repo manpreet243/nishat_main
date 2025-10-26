@@ -23,6 +23,18 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, salesHistory,
         ? salesmen.find(s => s.id === customer.salesmanId)?.name || 'Unknown' 
         : 'Unassigned';
 
+    // Determine the latest bottle rate for this customer from sales (prefer explicit unitPrice, fallback to amountReceived/bottlesSold)
+    const lastSale = salesHistory && salesHistory.length > 0 ? salesHistory.reduce((latest, s) => {
+        return (!latest || new Date(s.date) > new Date(latest.date)) ? s : latest;
+    }, salesHistory[0] as SaleRecord) : null;
+
+    const lastBottleRate = lastSale ? (typeof lastSale.unitPrice === 'number' && lastSale.unitPrice > 0 ? lastSale.unitPrice : (lastSale.bottlesSold > 0 && lastSale.amountReceived ? lastSale.amountReceived / lastSale.bottlesSold : undefined)) : undefined;
+
+    // Aggregate returned bottles from bottleLogs and sales history (both may record returns)
+    const returnedFromLogs = bottleLogs.reduce((sum, l) => sum + (l.bottlesReturned || 0), 0);
+    const returnedFromSales = salesHistory.reduce((sum, s) => sum + (s.bottlesReturned || 0), 0);
+    const totalReturnedBottles = returnedFromLogs + returnedFromSales;
+
     const handleSendReminder = () => {
         const url = generateWhatsAppReminderUrl(customer);
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -34,7 +46,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, salesHistory,
                 <div>
                     <h1 className="text-3xl font-bold text-brand-text-primary">{customer.name}</h1>
                     <p className="text-brand-text-secondary">
-                        {`House: ${customer.houseNumber}, Floor: ${customer.floor}, Flat: ${customer.flat}`}
+                        {`House: ${customer.houseNumber}, Floor: ${customer.floor}`}{(customer as any).flat ? `, Flat: ${(customer as any).flat}` : ''}
                     </p>
                     <p className="text-brand-text-secondary">Mobile: {customer.mobile}</p>
                     <p className="text-brand-text-secondary mt-1 flex items-center">
@@ -47,29 +59,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, salesHistory,
                 </button>
             </div>
             
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 text-center">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-brand-text-secondary">Total Balance</p>
-                    <p className="text-2xl font-semibold text-red-600">PKR {customer.totalBalance.toLocaleString()}</p>
-                </div>
-                 <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-brand-text-secondary">Bottles Purchased</p>
-                    <p className="text-2xl font-semibold text-brand-text-primary">{customer.bottlesPurchased}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-brand-text-secondary">Paid Bottles</p>
-                    <p className="text-2xl font-semibold text-green-600">{customer.paidBottles}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-brand-text-secondary">Unpaid Bottles</p>
-                    <p className="text-2xl font-semibold text-yellow-600">{getUnpaidBottles(customer)}</p>
-                </div>
-                 <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-brand-text-secondary">Empty Bottles Out</p>
-                    <p className="text-2xl font-semibold text-blue-600">{customer.emptyBottlesOnHand}</p>
-                </div>
-            </div>
+            {/* Stats removed per request; transaction history is shown below */}
 
             {/* Actions Bar */}
             <div className="p-4 flex justify-end items-center bg-gray-50 no-print mb-8 rounded-lg">
@@ -82,9 +72,8 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, salesHistory,
                 </button>
             </div>
 
-            {/* History Grids */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Transaction History */}
+            {/* Transaction History (full-width) */}
+            <div className="mb-8">
                  <div className="border rounded-lg overflow-hidden">
                     <div className="p-4 bg-gray-50">
                         <h2 className="text-xl font-bold text-brand-text-primary">Transaction History</h2>
@@ -93,59 +82,69 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, salesHistory,
                          <table className="w-full text-sm text-left text-brand-text-secondary">
                             <thead className="text-xs text-brand-text-secondary uppercase bg-gray-100 sticky top-0">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3">Date</th>
-                                    <th scope="col" className="px-6 py-3">Bottles Sold</th>
-                                    <th scope="col" className="px-6 py-3">Amount Received (PKR)</th>
+                                    <th scope="col" className="px-4 py-2">Date</th>
+                                    <th scope="col" className="px-4 py-2">Quantity</th>
+                                    <th scope="col" className="px-4 py-2">Bottle Rate (PKR)</th>
+                                    <th scope="col" className="px-4 py-2">Amount</th>
+                                    <th scope="col" className="px-4 py-2">Received</th>
+                                    <th scope="col" className="px-4 py-2">Balance</th>
+                                    <th scope="col" className="px-4 py-2">Remaining Empty Bottles</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {salesHistory.length > 0 ? (
-                                    salesHistory.map((sale) => (
-                                        <tr key={sale.id} className="bg-white border-b last:border-b-0">
-                                            <td className="px-6 py-4">{new Date(sale.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</td>
-                                            <td className="px-6 py-4">{sale.bottlesSold}</td>
-                                            <td className="px-6 py-4 font-semibold">{sale.amountReceived.toLocaleString()}</td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={3} className="text-center py-10 px-6 text-brand-text-secondary">
-                                            No transaction history found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                {salesHistory.length > 0 ? (() => {
+                                    // Merge sales and bottleLogs by date to compute running empty bottles
+                                    type Event = { type: 'sale' | 'log'; date: string; payload: any };
+                                    const events: Event[] = [];
+                                    salesHistory.forEach(s => events.push({ type: 'sale', date: s.date, payload: s }));
+                                    bottleLogs.forEach(l => events.push({ type: 'log', date: l.date, payload: l }));
+                                    events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                {/* Bottle Log History */}
-                 <div className="border rounded-lg overflow-hidden">
-                    <div className="p-4 bg-gray-50">
-                        <h2 className="text-xl font-bold text-brand-text-primary">Empty Bottle Log</h2>
-                    </div>
-                    <div className="overflow-x-auto max-h-96">
-                         <table className="w-full text-sm text-left text-brand-text-secondary">
-                            <thead className="text-xs text-brand-text-secondary uppercase bg-gray-100 sticky top-0">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3">Date</th>
-                                    <th scope="col" className="px-6 py-3">Taken</th>
-                                    <th scope="col" className="px-6 py-3">Returned</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {bottleLogs.length > 0 ? (
-                                    bottleLogs.map((log) => (
-                                        <tr key={log.id} className="bg-white border-b last:border-b-0">
-                                            <td className="px-6 py-4">{new Date(log.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</td>
-                                            <td className="px-6 py-4 font-semibold text-red-600">{log.bottlesTaken}</td>
-                                            <td className="px-6 py-4 font-semibold text-green-600">{log.bottlesReturned}</td>
+                                    let runningEmpty = 0;
+                                    // Build rows for sales only, after applying events in chronological order
+                                    const saleRows: Array<{
+                                        sale: any;
+                                        rate?: number;
+                                        amount: number;
+                                        balance: number;
+                                        remainingEmpty: number;
+                                    }> = [];
+
+                                    events.forEach(e => {
+                                        if (e.type === 'log') {
+                                            const l = e.payload as any;
+                                            const taken = (l.bottlesTaken || 0);
+                                            const returned = (l.bottlesReturned || 0);
+                                            runningEmpty += taken - returned;
+                                        } else {
+                                            const s = e.payload as any;
+                                            const rate = (typeof s.unitPrice === 'number' && s.unitPrice > 0) ? s.unitPrice : (s.bottlesSold > 0 && s.amountReceived ? s.amountReceived / s.bottlesSold : undefined);
+                                            const amount = rate ? rate * s.bottlesSold : (s.amountReceived || 0);
+                                            const balance = amount - (s.amountReceived || 0);
+                                            // Update running empty using sale data: sold adds bottles, returned reduces
+                                            const sold = s.bottlesSold || 0;
+                                            const ret = s.bottlesReturned || 0;
+                                            runningEmpty += sold - ret;
+
+                                            saleRows.push({ sale: s, rate, amount, balance, remainingEmpty: runningEmpty });
+                                        }
+                                    });
+
+                                    return saleRows.map(sr => (
+                                        <tr key={sr.sale.id} className="bg-white border-b last:border-b-0">
+                                            <td className="px-4 py-2">{new Date(sr.sale.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</td>
+                                            <td className="px-4 py-2">{sr.sale.bottlesSold}</td>
+                                            <td className="px-4 py-2">{sr.rate ? `PKR ${Number(sr.rate).toFixed(2)}` : '—'}</td>
+                                            <td className="px-4 py-2">{`PKR ${Number(sr.amount).toFixed(2)}`}</td>
+                                            <td className="px-4 py-2 font-semibold">{sr.sale.amountReceived ? `PKR ${Number(sr.sale.amountReceived).toFixed(2)}` : 'PKR 0.00'}</td>
+                                            <td className="px-4 py-2">{`PKR ${Number(sr.balance).toFixed(2)}`}</td>
+                                            <td className="px-4 py-2">{sr.remainingEmpty}</td>
                                         </tr>
-                                    ))
-                                ) : (
+                                    ));
+                                })() : (
                                     <tr>
-                                        <td colSpan={3} className="text-center py-10 px-6 text-brand-text-secondary">
-                                            No bottle transaction history found.
+                                        <td colSpan={7} className="text-center py-10 px-6 text-brand-text-secondary">
+                                            No transaction history found.
                                         </td>
                                     </tr>
                                 )}

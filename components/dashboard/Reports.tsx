@@ -72,10 +72,12 @@ const Reports: React.FC<ReportsProps> = ({ sales, expenses, customers }) => {
     }, [sales, expenses, customers, dateRange, customerSearch]);
 
     const stats = useMemo(() => {
-        const totalRevenue = filteredData.filteredSales.reduce((acc, s) => acc + s.amountReceived, 0);
+        const totalRevenueCash = filteredData.filteredSales.reduce((acc, s) => acc + (s.paymentMethod === 'cash' ? (s.amountReceived || 0) : 0), 0);
+        const totalRevenueBank = filteredData.filteredSales.reduce((acc, s) => acc + (s.paymentMethod === 'bank' ? (s.amountReceived || 0) : 0), 0);
+        const totalRevenue = totalRevenueCash + totalRevenueBank;
         const totalExpenses = filteredData.filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
         const netProfit = totalRevenue - totalExpenses;
-        return { totalRevenue, totalExpenses, netProfit };
+        return { totalRevenue, totalExpenses, netProfit, totalRevenueCash, totalRevenueBank };
     }, [filteredData]);
 
     const chartData = useMemo(() => ([
@@ -128,9 +130,9 @@ const Reports: React.FC<ReportsProps> = ({ sales, expenses, customers }) => {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <StatCard title="Total Revenue" value={`PKR ${stats.totalRevenue.toLocaleString()}`} icon={<DollarSignIcon />} color="text-green-500" />
-                    <StatCard title="Total Expenses" value={`PKR ${stats.totalExpenses.toLocaleString()}`} icon={<CreditCardIcon />} color="text-red-500" />
-                    <StatCard title="Net Profit" value={`PKR ${stats.netProfit.toLocaleString()}`} icon={<span></span>} color={stats.netProfit >= 0 ? 'text-blue-600' : 'text-red-600'} />
+                    <StatCard title="Cash Revenue" value={`PKR ${stats.totalRevenueCash.toLocaleString()}`} icon={<DollarSignIcon />} color="text-green-500" />
+                    <StatCard title="Bank Revenue" value={`PKR ${stats.totalRevenueBank.toLocaleString()}`} icon={<CreditCardIcon />} color="text-yellow-500" />
+                    <StatCard title="Net Balance" value={`PKR ${stats.netProfit.toLocaleString()}`} icon={<span></span>} color={stats.netProfit >= 0 ? 'text-blue-600' : 'text-red-600'} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -173,16 +175,81 @@ const Reports: React.FC<ReportsProps> = ({ sales, expenses, customers }) => {
                             </div>
                         </div>
                          <div>
-                            <h4 className="font-bold text-lg mb-2">Expenses ({filteredData.filteredExpenses.length})</h4>
-                             <div className="border rounded-lg overflow-auto max-h-96">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 sticky top-0"><tr><th className="px-4 py-2 text-left">Description</th><th className="px-4 py-2 text-right">Amount (PKR)</th></tr></thead>
-                                    <tbody className="divide-y">{filteredData.filteredExpenses.map(e => <tr key={e.id}>
-                                        <td className="px-4 py-2">{e.description}</td>
-                                        <td className="px-4 py-2 text-right font-medium">{e.amount.toLocaleString()}</td>
-                                    </tr>)}</tbody>
-                                </table>
-                            </div>
+                                <h4 className="font-bold text-lg mb-2">Expenses ({filteredData.filteredExpenses.length})</h4>
+                                 <div className="border rounded-lg overflow-auto max-h-96">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50 sticky top-0">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left">Name</th>
+                                                <th className="px-4 py-2 text-left">Payment From</th>
+                                                <th className="px-4 py-2 text-right">Amount (PKR)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {filteredData.filteredExpenses.map(e => (
+                                                <tr key={e.id}>
+                                                    <td className="px-4 py-2">{e.name || e.category || ''}</td>
+                                                    <td className="px-4 py-2">{e.paymentAccount === 'bank' ? 'Bank' : 'Cash'}</td>
+                                                    <td className="px-4 py-2 text-right font-medium">{e.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                        </div>
+                    </div>
+                    <div className="mt-8">
+                        <h4 className="font-bold text-lg mb-2">Payments by Customer</h4>
+                        <div className="border rounded-lg overflow-auto max-h-96">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">Customer</th>
+                                        <th className="px-4 py-2 text-right">Cash (PKR)</th>
+                                        <th className="px-4 py-2 text-right">Bank (PKR)</th>
+                                        <th className="px-4 py-2 text-right">Total (PKR)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {(() => {
+                                        // aggregate per customer
+                                        const map = new Map<number | string, { name: string; cash: number; bank: number }>();
+                                        filteredData.filteredSales.forEach(s => {
+                                            const key = s.customerId || s.customerName || 'Unknown';
+                                            const existing = map.get(key) || { name: s.customerName || (customers.find(c => c.id === s.customerId)?.name) || 'Unknown', cash: 0, bank: 0 };
+                                            const amt = s.amountReceived || 0;
+                                            if (s.paymentMethod === 'bank') existing.bank += amt;
+                                            else existing.cash += amt; // default to cash when undefined
+                                            map.set(key, existing);
+                                        });
+                                        const rows = Array.from(map.entries()).map(([key, val]) => ({ key, ...val, total: val.cash + val.bank }));
+                                        // sort by total desc
+                                        rows.sort((a, b) => b.total - a.total);
+                                        return rows.map(r => (
+                                            <tr key={String(r.key)}>
+                                                <td className="px-4 py-2">{r.name}</td>
+                                                <td className="px-4 py-2 text-right font-medium">{r.cash.toLocaleString()}</td>
+                                                <td className="px-4 py-2 text-right font-medium">{r.bank.toLocaleString()}</td>
+                                                <td className="px-4 py-2 text-right font-bold">{r.total.toLocaleString()}</td>
+                                            </tr>
+                                        ));
+                                    })()}
+                                </tbody>
+                                <tfoot className="bg-gray-50 sticky bottom-0">
+                                    <tr>
+                                        <td className="px-4 py-2 font-bold">Totals</td>
+                                        <td className="px-4 py-2 text-right font-bold">{stats.totalRevenueCash.toLocaleString()}</td>
+                                        <td className="px-4 py-2 text-right font-bold">{stats.totalRevenueBank.toLocaleString()}</td>
+                                        <td className="px-4 py-2 text-right font-bold">{stats.totalRevenue.toLocaleString()}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div className="mt-4 p-4 bg-gray-50 rounded">
+                            <p className="text-sm">Verification: <span className="font-semibold">Cash + Bank - Expenses = Net Balance</span></p>
+                            <p className="mt-2">PKR {stats.totalRevenueCash.toLocaleString()} + PKR {stats.totalRevenueBank.toLocaleString()} - PKR {stats.totalExpenses.toLocaleString()} = <span className="font-bold">PKR {(stats.totalRevenueCash + stats.totalRevenueBank - stats.totalExpenses).toLocaleString()}</span></p>
+                            <p className="text-sm text-gray-600 mt-1">Net Balance (computed): PKR {stats.netProfit.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,7 @@ interface AddSaleModalProps {
         bottlesReturned: number;
         bottleCategory?: string;
         bottleItemId?: number;
+        paymentMethod?: 'cash' | 'bank';
     }) => void;
     customer: Customer | null;
     salesmen: Salesman[];
@@ -28,6 +29,7 @@ const AddSaleModal: React.FC<AddSaleModalProps> = ({ isOpen, onClose, onAddSale,
     const [totalCost, setTotalCost] = useState(0);
     const [updateBalance, setUpdateBalance] = useState(true);
     const [salesmanId, setSalesmanId] = useState<number | undefined>(undefined);
+    const [paymentMethod, setPaymentMethod] = useState<'cash'|'bank'>('cash');
     const [bottleCategory, setBottleCategory] = useState<string>('');
     const [categories, setCategories] = useState<string[]>([]);
     const [itemsByCategory, setItemsByCategory] = useState<Record<string, { id: number; name: string; stock: number }[]>>({});
@@ -92,7 +94,8 @@ const AddSaleModal: React.FC<AddSaleModalProps> = ({ isOpen, onClose, onAddSale,
                 salesmanId,
                 bottlesReturned,
                 bottleCategory: bottleCategory || undefined,
-                bottleItemId: selectedItemId,
+            bottleItemId: selectedItemId,
+            paymentMethod,
             });
             onClose();
         }
@@ -144,6 +147,19 @@ const AddSaleModal: React.FC<AddSaleModalProps> = ({ isOpen, onClose, onAddSale,
                     <div>
                         <label htmlFor="amount-received" className="block text-sm font-medium text-brand-text-secondary">Amount Received (PKR)</label>
                         <input type="number" id="amount-received" value={amountReceived} onChange={e => setAmountReceived(Number(e.target.value))} required min="0" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text-secondary">Payment Method</label>
+                        <div className="mt-1 flex items-center space-x-4">
+                            <label className="inline-flex items-center">
+                                <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} className="form-radio" />
+                                <span className="ml-2 text-sm">Cash</span>
+                            </label>
+                            <label className="inline-flex items-center">
+                                <input type="radio" name="paymentMethod" value="bank" checked={paymentMethod === 'bank'} onChange={() => setPaymentMethod('bank')} className="form-radio" />
+                                <span className="ml-2 text-sm">Bank</span>
+                            </label>
+                        </div>
                     </div>
                     <div>
                         <label htmlFor="bottles-returned" className="block text-sm font-medium text-brand-text-secondary">Empty Bottles Returned</label>

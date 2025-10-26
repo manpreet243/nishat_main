@@ -39,6 +39,12 @@ const Signup: React.FC<SignupProps> = ({ onSignup, showLogin }) => {
 
         const newUser = { name, email, password };
         window.localStorage.setItem('users', JSON.stringify([newUser, ...users]));
+        // Persist current user so Header can display admin name after signup
+        try {
+          window.localStorage.setItem('currentUser', JSON.stringify(newUser));
+        } catch (err) {
+          console.warn('Failed to persist current user', err);
+        }
         // After signup, call onSignup to proceed to app
         onSignup();
       } catch (err) {

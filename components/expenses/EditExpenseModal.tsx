@@ -1,24 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Expense } from '../../types';
+import { Expense, ExpenseAccount } from '../../types';
 
 interface EditExpenseModalProps {
     isOpen: boolean;
     onClose: () => void;
     expense: Expense | null;
     onUpdateExpense: (expense: Expense) => void;
+    accounts?: ExpenseAccount[];
 }
 
-const EditExpenseModal: React.FC<EditExpenseModalProps> = ({ isOpen, onClose, expense, onUpdateExpense }) => {
+const EditExpenseModal: React.FC<EditExpenseModalProps> = ({ isOpen, onClose, expense, onUpdateExpense, accounts = [] }) => {
     const [date, setDate] = useState('');
-    const [category, setCategory] = useState('');
+    const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [category, setCategory] = useState('');
     const [amount, setAmount] = useState(0);
+    const [paymentAccount, setPaymentAccount] = useState<'cash'|'bank'>('cash');
+    const [selectedAccountId, setSelectedAccountId] = useState<number | undefined>(undefined);
 
     useEffect(() => {
         if (expense) {
             setDate(expense.date);
-            setCategory(expense.category);
+            setName(expense.name || expense.category || '');
             setDescription(expense.description);
+            setCategory(expense.category || '');
+            setPaymentAccount(expense.paymentAccount || 'cash');
+            setSelectedAccountId(expense.accountId);
             setAmount(expense.amount);
         }
     }, [expense]);
@@ -29,9 +36,12 @@ const EditExpenseModal: React.FC<EditExpenseModalProps> = ({ isOpen, onClose, ex
             const updatedExpense: Expense = {
                 ...expense,
                 date,
-                category,
+                name,
                 description,
+                category,
                 amount,
+                paymentAccount,
+                accountId: selectedAccountId,
             };
             onUpdateExpense(updatedExpense);
         }
@@ -52,12 +62,31 @@ const EditExpenseModal: React.FC<EditExpenseModalProps> = ({ isOpen, onClose, ex
                         <input type="date" id="edit-date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
                     </div>
                     <div>
-                        <label htmlFor="edit-category" className="block text-sm font-medium text-brand-text-secondary">Category</label>
-                        <input type="text" id="edit-category" value={category} placeholder="e.g., Utilities, Salaries" onChange={e => setCategory(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
+                        <label htmlFor="edit-account" className="block text-sm font-medium text-brand-text-secondary">Account / Owner (optional)</label>
+                        <select id="edit-account" value={selectedAccountId ?? ''} onChange={e => setSelectedAccountId(e.target.value ? Number(e.target.value) : undefined)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm">
+                            <option value="">-- Select account --</option>
+                            {/** accounts prop may be undefined; guard */}
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="edit-name" className="block text-sm font-medium text-brand-text-secondary">Name</label>
+                        <input type="text" id="edit-name" value={name} placeholder="e.g., Electricity, Rent" onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
                     </div>
                     <div>
                         <label htmlFor="edit-description" className="block text-sm font-medium text-brand-text-secondary">Description</label>
                         <input type="text" id="edit-description" value={description} placeholder="e.g., Monthly electricity bill" onChange={e => setDescription(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-category" className="block text-sm font-medium text-brand-text-secondary">Category</label>
+                        <input type="text" id="edit-category" value={category} placeholder="e.g., Utilities" onChange={e => setCategory(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm" />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-payment-account" className="block text-sm font-medium text-brand-text-secondary">Payment From</label>
+                        <select id="edit-payment-account" value={paymentAccount} onChange={e => setPaymentAccount(e.target.value as 'cash'|'bank')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue sm:text-sm">
+                            <option value="cash">Cash</option>
+                            <option value="bank">Bank</option>
+                        </select>
                     </div>
                     <div>
                         <label htmlFor="edit-amount" className="block text-sm font-medium text-brand-text-secondary">Amount (PKR)</label>

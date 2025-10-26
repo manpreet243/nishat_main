@@ -15,6 +15,7 @@ export type View =
   | 'salesmen'
   | 'reports'
   | 'closing'
+  | 'dailyAssigned'
   | 'settings'
   | 'customerDetail'
   | 'inventoryDetail'
@@ -36,6 +37,22 @@ export interface Customer {
   dailyRequirement?: number;
   deliveryDays: string[];
   emptyBottlesOnHand: number;
+
+  // Manual/administrative fields (optional)
+  outstandingBalance?: number; // manual outstanding amount that can be entered by admin
+  receivedAmount?: number; // manual payments received recorded outside sales
+  advancePayment?: number; // advance/credit given to customer
+
+  // Assignment fields
+  assignedAreaId?: number; // links to an Area
+  sector?: string; // sector code A..F (simple string to keep flexible)
+  assignedSalesmanId?: number; // optional explicit assignment
+}
+
+export interface Area {
+  id: number;
+  name: string;
+  description?: string;
 }
 
 export interface Salesman {
@@ -43,6 +60,7 @@ export interface Salesman {
   name: string;
   mobile: string;
   hireDate: string; // ISO date string
+  assignedAreaId?: number; // optional area assignment
 }
 
 export interface SaleRecord {
@@ -59,14 +77,24 @@ export interface SaleRecord {
   bottleCategory?: string;
   bottleItemId?: number;
   unitPrice?: number; // recorded unit price used for this sale (from inventory.s sellPrice)
+  paymentMethod?: 'cash' | 'bank';
 }
 
 export interface Expense {
   id: number;
   date: string; // ISO date string
-  category: string;
+  // 'name' is the primary label for an expense (e.g., Supplier or Title). 'category' kept for backward compatibility.
+  name?: string;
+  category?: string;
   description: string;
   amount: number;
+  paymentAccount?: 'cash' | 'bank'; // which account the expense was paid from
+  accountId?: number; // optional link to an expense account (owner/vendor)
+}
+
+export interface ExpenseAccount {
+  id: number;
+  name: string;
 }
 
 export interface InventoryItem {
@@ -111,4 +139,16 @@ export interface MonthlyClosing {
   expenses: Expense[];
   totalRevenue: number;
   totalExpenses: number;
+}
+
+// Daily assignment for salesman — standalone, not linked to inventory or revenue
+export interface DailyBottleAssignment {
+  id: number;
+  date: string; // ISO date
+  salesmanId: number;
+  salesmanName: string;
+  assignedCount: number; // bottles assigned for the day
+  soldCount: number; // bottles sold (entered manually)
+  remainingCount: number; // calculated or entered remaining bottles
+  notes?: string;
 }

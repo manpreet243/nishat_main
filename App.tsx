@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { View, Customer, Salesman, SaleRecord, Expense, InventoryItem, BottleLog, SalesmanPayment, StockAdjustment, MonthlyClosing } from './types';
+import { View, Customer, Salesman, SaleRecord, Expense, InventoryItem, BottleLog, SalesmanPayment, StockAdjustment, MonthlyClosing, ExpenseAccount } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import { showToast } from './utils/toast';
 import { mockCustomers, mockSalesmen, mockSales, mockExpenses, mockInventory, mockBottleLogs, mockSalesmanPayments, mockStockAdjustments } from './mockData';
+import { mockAreas } from './mockData';
 import DomainProtection from './components/auth/DomainProtection';
 import { getEnvironmentConfig } from './config/domainConfig';
 
@@ -11,6 +12,7 @@ import { getEnvironmentConfig } from './config/domainConfig';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
+const DailyBottlesAssigned = lazy(() => import('./components/dashboard/DailyBottlesAssigned'));
 const CustomerTable = lazy(() => import('./components/dashboard/CustomerTable'));
 const CustomerFilters = lazy(() => import('./components/dashboard/CustomerFilters'));
 const DailySales = lazy(() => import('./components/dashboard/DailySales'));
@@ -66,18 +68,53 @@ const App: React.FC = () => {
     const [authStatus, setAuthStatus] = useState<AuthStatus>('chooser');
     const [userType, setUserType] = useState<UserType | null>(null);
     const [loggedInSalesman, setLoggedInSalesman] = useState<Salesman | null>(null);
+    const [adminName, setAdminName] = useState<string | null>(null);
 
     // Data State using Local Storage
     const [customers, setCustomers] = useLocalStorage<Customer[]>('customers', mockCustomers);
     const [salesmen, setSalesmen] = useLocalStorage<Salesman[]>('salesmen', mockSalesmen);
+    const [areas, setAreas] = useLocalStorage<any[]>('areas', mockAreas);
     const [sales, setSales] = useLocalStorage<SaleRecord[]>('sales', mockSales);
     const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', mockExpenses);
+    const [expenseAccounts, setExpenseAccounts] = useLocalStorage<ExpenseAccount[]>('expenseAccounts', []);
     const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('inventory', mockInventory);
     const [warehouseStock, setWarehouseStock] = useLocalStorage<number>('warehouseStock', 1000);
     const [bottleLogs, setBottleLogs] = useLocalStorage<BottleLog[]>('bottleLogs', mockBottleLogs);
+    const [cashBalance, setCashBalance] = useLocalStorage<number>('cashBalance', 0);
+    const [bankBalance, setBankBalance] = useLocalStorage<number>('bankBalance', 0);
     const [salesmanPayments, setSalesmanPayments] = useLocalStorage<SalesmanPayment[]>('salesmanPayments', mockSalesmanPayments);
     const [stockAdjustments, setStockAdjustments] = useLocalStorage<StockAdjustment[]>('stockAdjustments', mockStockAdjustments);
     const [monthlyClosings, setMonthlyClosings] = useLocalStorage<MonthlyClosing[]>('monthlyClosings', []);
+
+    // Normalize customer records on first load to ensure new fields exist and avoid undefineds
+    useEffect(() => {
+        setCustomers(prev => prev.map(c => ({
+            ...c,
+            outstandingBalance: typeof (c as any).outstandingBalance === 'number' ? (c as any).outstandingBalance : 0,
+            receivedAmount: typeof (c as any).receivedAmount === 'number' ? (c as any).receivedAmount : 0,
+            advancePayment: typeof (c as any).advancePayment === 'number' ? (c as any).advancePayment : 0,
+            assignedAreaId: typeof (c as any).assignedAreaId === 'number' ? (c as any).assignedAreaId : undefined,
+            sector: typeof (c as any).sector === 'string' ? (c as any).sector : undefined,
+            assignedSalesmanId: typeof (c as any).assignedSalesmanId === 'number' ? (c as any).assignedSalesmanId : undefined,
+            deliveryArea: typeof c.deliveryArea === 'string' ? c.deliveryArea : undefined,
+        })));
+        // ensure salesmen carry assignedAreaId default if missing
+        setSalesmen(prev => prev.map(s => ({ ...s, assignedAreaId: typeof (s as any).assignedAreaId === 'number' ? (s as any).assignedAreaId : undefined })));
+        // ensure areas exist
+        if (!areas || areas.length === 0) {
+            setAreas(mockAreas as any);
+        }
+        // load admin name from persisted currentUser if present
+        try {
+            const raw = window.localStorage.getItem('currentUser');
+            if (raw) {
+                const cu = JSON.parse(raw) as { name?: string; email?: string };
+                setAdminName(cu.name || cu.email || null);
+            }
+        } catch (err) {
+            // ignore
+        }
+    }, []);
 
     // UI State
     const [activeView, setActiveView] = useState<View>('dashboard');
@@ -91,6 +128,7 @@ const App: React.FC = () => {
     const [isDeleteCustomerModalOpen, setDeleteCustomerModalOpen] = useState(false);
     const [isAddSaleModalOpen, setAddSaleModalOpen] = useState(false);
     const [isAddExpenseModalOpen, setAddExpenseModalOpen] = useState(false);
+    const [addExpenseInitialAccountId, setAddExpenseInitialAccountId] = useState<number | null>(null);
     const [isEditExpenseModalOpen, setEditExpenseModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isAddInventoryItemModalOpen, setAddInventoryItemModalOpen] = useState(false);
@@ -146,12 +184,27 @@ const App: React.FC = () => {
             setLoggedInSalesman(salesman);
         }
         setActiveView('dashboard');
+        // If admin logged in, try to read persisted currentUser and set adminName
+        if (type === 'admin') {
+            try {
+                const raw = window.localStorage.getItem('currentUser');
+                if (raw) {
+                    const cu = JSON.parse(raw) as { name?: string; email?: string };
+                    setAdminName(cu.name || cu.email || null);
+                }
+            } catch (err) { /* ignore */ }
+        }
     };
 
     const handleLogout = () => {
         setAuthStatus('chooser');
         setUserType(null);
         setLoggedInSalesman(null);
+        // clear persisted current user and admin name
+        try {
+            window.localStorage.removeItem('currentUser');
+        } catch (err) { /* ignore */ }
+        setAdminName(null);
     };
 
     const handleNavigate = (view: View) => {
@@ -172,6 +225,13 @@ const App: React.FC = () => {
             deliveryDueToday: false, // Default value
             deliveryDays: [],
             emptyBottlesOnHand: 0,
+            // ensure manual fields exist
+            outstandingBalance: 0,
+            receivedAmount: 0,
+            advancePayment: 0,
+            assignedAreaId: (customerData as any).assignedAreaId ?? undefined,
+            sector: (customerData as any).sector ?? undefined,
+            assignedSalesmanId: (customerData as any).assignedSalesmanId ?? undefined,
         };
         setCustomers(prev => [...prev, newCustomer]);
         showToast('Customer added successfully!', 'success');
@@ -196,7 +256,7 @@ const App: React.FC = () => {
     };
     
     // Sale Handlers
-    const handleAddSale = (saleData: { customerId: number; customerName: string; bottlesSold: number; amountReceived: number; updateBalance: boolean; salesmanId?: number; bottlesReturned: number; bottleCategory?: string; bottleItemId?: number }) => {
+    const handleAddSale = (saleData: { customerId: number; customerName: string; bottlesSold: number; amountReceived: number; updateBalance: boolean; salesmanId?: number; bottlesReturned: number; bottleCategory?: string; bottleItemId?: number; paymentMethod?: 'cash'|'bank' }) => {
         const { customerId, bottlesSold, amountReceived, updateBalance, bottlesReturned, customerName, bottleCategory, bottleItemId } = saleData;
 
         // Get customer to access their individual bottle price
@@ -421,6 +481,50 @@ const App: React.FC = () => {
         showToast('Payment recorded!', 'success');
     };
 
+    // Expense handlers: update and delete should reconcile cash/bank balances
+    const handleUpdateExpense = (updatedExpense: Expense) => {
+        const original = expenses.find(e => e.id === updatedExpense.id);
+        if (!original) return;
+
+        // Revert original deduction
+        if (original.paymentAccount === 'bank') {
+            setBankBalance(prev => prev + (original.amount || 0));
+        } else {
+            setCashBalance(prev => prev + (original.amount || 0));
+        }
+
+        // Apply new deduction
+        if (updatedExpense.paymentAccount === 'bank') {
+            setBankBalance(prev => prev - (updatedExpense.amount || 0));
+        } else {
+            setCashBalance(prev => prev - (updatedExpense.amount || 0));
+        }
+
+        setExpenses(prev => prev.map(e => e.id === updatedExpense.id ? updatedExpense : e));
+        setEditExpenseModalOpen(false);
+        showToast('Expense updated!', 'success');
+    };
+
+    const handleDeleteExpense = (expenseId: number) => {
+        const exp = expenses.find(e => e.id === expenseId);
+        if (!exp) return;
+
+        // Revert the deduction
+        if (exp.paymentAccount === 'bank') {
+            setBankBalance(prev => prev + (exp.amount || 0));
+        } else {
+            setCashBalance(prev => prev + (exp.amount || 0));
+        }
+
+        setExpenses(prev => prev.filter(e => e.id !== expenseId));
+        // If currently editing this expense, close modal
+        if (editingExpense && editingExpense.id === expenseId) {
+            setEditExpenseModalOpen(false);
+            setEditingExpense(null);
+        }
+        showToast('Expense deleted and balances reconciled!', 'success');
+    };
+
 
     // Effect to update delivery-due status daily
     useEffect(() => {
@@ -450,12 +554,15 @@ const App: React.FC = () => {
                             onViewDetails={(c) => { setSelectedCustomer(c); setActiveView('customerDetail'); }}
                             onEdit={(c) => { setSelectedCustomer(c); setEditCustomerModalOpen(true); }}
                             onDelete={(c) => { setSelectedCustomer(c); setDeleteCustomerModalOpen(true); }}
+                                sales={sales}
+                                bottleLogs={bottleLogs}
                         />
                     </>
                 );
                 case 'customerDetail': return selectedCustomer ? <CustomerDetail customer={selectedCustomer} salesHistory={sales.filter(s => s.customerId === selectedCustomer.id)} bottleLogs={bottleLogs.filter(b => b.customerId === selectedCustomer.id)} salesmen={salesmen} onBack={() => handleNavigate('customers')} /> : <div>No customer selected.</div>;
+                case 'dailyAssigned': return <DailyBottlesAssigned salesmen={salesmen} />;
                 case 'sales': return <DailySales sales={sales} salesmen={salesmen} onAddCounterSale={() => setAddCounterSaleModalOpen(true)} onEditSale={(s) => {setEditingSale(s); setEditSaleModalOpen(true)}} onDeleteSale={(s) => {setSaleToDelete(s); setDeleteSaleModalOpen(true)}} />;
-                case 'expenses': return <Expenses expenses={expenses} onAddExpense={() => setAddExpenseModalOpen(true)} onEditExpense={(e) => {setEditingExpense(e); setEditExpenseModalOpen(true)}} />;
+                case 'expenses': return <Expenses expenses={expenses} accounts={expenseAccounts} onAddExpense={(id?: number | null) => { setAddExpenseModalOpen(true); setAddExpenseInitialAccountId(id ?? null); }} onEditExpense={(e) => {setEditingExpense(e); setEditExpenseModalOpen(true)}} onDeleteExpense={handleDeleteExpense} />;
                 case 'inventory': return <Inventory inventory={inventory} onAddItem={() => setAddInventoryItemModalOpen(true)} onEditItem={(i) => {setItemToEdit(i); setEditInventoryItemModalOpen(true)}} onDeleteItem={(i) => {setItemToEdit(i); setDeleteInventoryItemModalOpen(true)}} onAdjustStock={(i) => {setItemToEdit(i); setAdjustStockModalOpen(true)}} onViewDetails={(i) => {setSelectedInventoryItem(i); setActiveView('inventoryDetail')}} />;
                 case 'inventoryDetail': return selectedInventoryItem ? <InventoryItemDetail item={selectedInventoryItem} history={stockAdjustments.filter(sa => sa.itemId === selectedInventoryItem.id)} onBack={() => handleNavigate('inventory')} /> : <div>No item selected.</div>;
                 case 'stock': return <Stock inventory={inventory} onAddItem={() => setAddInventoryItemModalOpen(true)} onEditItem={(i) => {setItemToEdit(i); setEditInventoryItemModalOpen(true)}} onDeleteItem={(i) => {setItemToEdit(i); setDeleteInventoryItemModalOpen(true)}} onAdjustStock={(i) => {setItemToEdit(i); setAdjustStockModalOpen(true)}} onViewDetails={(i) => {setSelectedInventoryItem(i); setActiveView('inventoryDetail')}} warehouseStock={warehouseStock} />;
@@ -525,25 +632,48 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <div className="no-print">
-                        <Header onLogout={handleLogout} />
+                        <Header
+                            onLogout={handleLogout}
+                            adminName={adminName}
+                            onOpenNotifications={() => handleNavigate('reminders')}
+                            notificationsCount={customers.filter(c => c.deliveryDueToday || c.totalBalance > 0).length}
+                        />
                     </div>
+                    
                     <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
                         <Suspense fallback={<div>Loading...</div>}>
                             {renderContent()}
                         </Suspense>
                     </main>
+                    {/* Footer removed per request */}
                 </div>
 
                 {/* Modals */}
                 <div className="no-print">
                     <Suspense fallback={null}>
-                        <AddCustomerModal isOpen={isAddCustomerModalOpen} onClose={() => setAddCustomerModalOpen(false)} onAddCustomer={handleAddCustomer} salesmen={salesmen} />
-                        <EditCustomerModal isOpen={isEditCustomerModalOpen} onClose={() => setEditCustomerModalOpen(false)} customer={selectedCustomer} onUpdateCustomer={handleUpdateCustomer} salesmen={salesmen} />
+                        <AddCustomerModal isOpen={isAddCustomerModalOpen} onClose={() => setAddCustomerModalOpen(false)} onAddCustomer={handleAddCustomer} salesmen={salesmen} areas={areas} />
+                        <EditCustomerModal isOpen={isEditCustomerModalOpen} onClose={() => setEditCustomerModalOpen(false)} customer={selectedCustomer} onUpdateCustomer={handleUpdateCustomer} salesmen={salesmen} areas={areas} />
                         <DeleteCustomerModal isOpen={isDeleteCustomerModalOpen} onClose={() => setDeleteCustomerModalOpen(false)} onConfirm={handleDeleteCustomer} customerName={selectedCustomer?.name || ''} />
                         <AddSaleModal isOpen={isAddSaleModalOpen} onClose={() => setAddSaleModalOpen(false)} onAddSale={handleAddSale} customer={selectedCustomer} salesmen={salesmen} inventory={inventory} />
 
-                        <AddExpenseModal isOpen={isAddExpenseModalOpen} onClose={() => setAddExpenseModalOpen(false)} onAddExpense={(expense) => { setExpenses(prev => [{ ...expense, id: Date.now() }, ...prev]); showToast('Expense added!', 'success'); }} />
-                        <EditExpenseModal isOpen={isEditExpenseModalOpen} onClose={() => setEditExpenseModalOpen(false)} expense={editingExpense} onUpdateExpense={(expense) => { setExpenses(prev => prev.map(e => e.id === expense.id ? expense : e)); setEditExpenseModalOpen(false); showToast('Expense updated!', 'success'); }} />
+                        <AddExpenseModal isOpen={isAddExpenseModalOpen} onClose={() => { setAddExpenseModalOpen(false); setAddExpenseInitialAccountId(null); }} accounts={expenseAccounts} onCreateAccount={(name: string) => {
+                            const acc = { id: Date.now(), name };
+                            setExpenseAccounts(prev => [acc, ...prev]);
+                            return acc;
+                        }} onAddExpense={(expense) => {
+                            // Persist expense
+                            const withId = { ...expense, id: Date.now() };
+                            setExpenses(prev => [withId, ...prev]);
+                            // Deduct from selected account
+                            if (expense.paymentAccount === 'bank') {
+                                setBankBalance(prev => prev - (expense.amount || 0));
+                            } else {
+                                // default to cash when undefined
+                                setCashBalance(prev => prev - (expense.amount || 0));
+                            }
+                            showToast('Expense added!', 'success');
+                        }} initialAccountId={addExpenseInitialAccountId} />
+                        <EditExpenseModal isOpen={isEditExpenseModalOpen} onClose={() => setEditExpenseModalOpen(false)} accounts={expenseAccounts} expense={editingExpense} onUpdateExpense={handleUpdateExpense} />
                         
                         <AddInventoryItemModal isOpen={isAddInventoryItemModalOpen} onClose={() => setAddInventoryItemModalOpen(false)} onAddItem={(item) => {
                             const newItem = {...item, id: Date.now()};

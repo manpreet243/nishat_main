@@ -25,6 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
     // Fix: Explicitly type the navItems array to ensure item.view is of type 'View'.
     const mainNavItems: { view: View; label: string; icon: React.ReactNode }[] = [
         { view: 'dashboard', label: 'Dashboard', icon: <HomeIcon /> },
+        { view: 'dailyAssigned', label: 'Daily bottles Assigned', icon: <CalendarIcon /> },
         { view: 'customers', label: 'Customers', icon: <UsersIcon /> },
         { view: 'stock', label: 'Stock', icon: <PackageIcon /> },
         { view: 'outstanding', label: 'Outstanding', icon: <DollarSignIcon /> },

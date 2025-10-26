@@ -34,6 +34,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, showSignup }) => {
 
         const found = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
         if (found) {
+          // Persist the current user so the app can display the admin name
+          try {
+            window.localStorage.setItem('currentUser', JSON.stringify(found));
+          } catch (err) {
+            console.warn('Failed to persist current user', err);
+          }
           onLogin();
         } else {
           setError('Invalid credentials. Please sign up or check your email/password.');

@@ -1,25 +1,37 @@
 import { Customer, Salesman, SaleRecord, Expense, InventoryItem, BottleLog, SalesmanPayment, StockAdjustment } from './types';
 
 export const mockSalesmen: Salesman[] = [
-    { id: 1, name: 'Ali Khan', mobile: '923001234567', hireDate: '2023-01-15' },
-    { id: 2, name: 'Bilal Ahmed', mobile: '923017654321', hireDate: '2023-03-10' },
+    { id: 1, name: 'Ali Khan', mobile: '923001234567', hireDate: '2023-01-15', assignedAreaId: 1 },
+    { id: 2, name: 'Bilal Ahmed', mobile: '923017654321', hireDate: '2023-03-10', assignedAreaId: 2 },
+];
+
+export const mockAreas = [
+    { id: 1, name: 'Area A', description: 'Sector A and nearby' },
+    { id: 2, name: 'Area B', description: 'Sector B and nearby' },
+    { id: 3, name: 'Area C', description: 'Sector C' },
+    { id: 4, name: 'Area D', description: 'Sector D' },
+    { id: 5, name: 'Area E', description: 'Sector E' },
+    { id: 6, name: 'Area F', description: 'Sector F' },
 ];
 
 export const mockCustomers: Customer[] = [
         { 
             id: 1, name: 'Ibrahim Pasha', houseNumber: '123-B', floor: 2, mobile: '923331122333',
             bottlesPurchased: 50, paidBottles: 45, totalBalance: 500, deliveryDueToday: true, salesmanId: 1, 
-            dailyRequirement: 2, deliveryDays: ['Monday', 'Thursday'], emptyBottlesOnHand: 5 
+            dailyRequirement: 2, deliveryDays: ['Monday', 'Thursday'], emptyBottlesOnHand: 5,
+            assignedAreaId: 1
         },
         { 
             id: 2, name: 'Fatima Jinnah', houseNumber: '45-C', floor: 1, mobile: '923214455666',
             bottlesPurchased: 20, paidBottles: 20, totalBalance: 0, deliveryDueToday: false, salesmanId: 2, 
-            dailyRequirement: 1, deliveryDays: ['Tuesday', 'Friday'], emptyBottlesOnHand: 2 
+            dailyRequirement: 1, deliveryDays: ['Tuesday', 'Friday'], emptyBottlesOnHand: 2,
+            assignedAreaId: 2
         },
         { 
             id: 3, name: 'Zain Abdullah', houseNumber: '88-F', floor: 5, mobile: '923118877665',
             bottlesPurchased: 15, paidBottles: 10, totalBalance: 500, deliveryDueToday: true, salesmanId: 1, 
-            dailyRequirement: 1, deliveryDays: ['Wednesday', 'Saturday', 'Monday'], emptyBottlesOnHand: 3 
+            dailyRequirement: 1, deliveryDays: ['Wednesday', 'Saturday', 'Monday'], emptyBottlesOnHand: 3,
+            assignedAreaId: 1
         },
 ];
 
